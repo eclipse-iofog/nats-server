@@ -100,6 +100,47 @@ image_without_tag() {
   fi
 }
 
+# Parse digest-pinned FROM lines, skipping BuildKit flags (e.g. --platform=$BUILDPLATFORM).
+# Sets image_ref, pinned, and from_prefix (flags to preserve in update suggestions).
+parse_from_image() {
+  local line="$1"
+  local -a tokens
+  local i=1 tok image_spec
+
+  image_ref=""
+  pinned=""
+  from_prefix=""
+
+  [[ "$line" =~ ^FROM[[:space:]] ]] || return 1
+
+  read -r -a tokens <<< "$line"
+
+  while [[ $i -lt ${#tokens[@]} ]]; do
+    tok="${tokens[$i]}"
+    if [[ "$tok" == --* ]]; then
+      if [[ "$tok" == *=* ]]; then
+        from_prefix+=" ${tok}"
+        i=$((i + 1))
+      else
+        from_prefix+=" ${tok} ${tokens[$((i + 1))]:-}"
+        i=$((i + 2))
+      fi
+      continue
+    fi
+    break
+  done
+
+  image_spec="${tokens[$i]:-}"
+  if [[ "$image_spec" =~ ^([^[:space:]@]+)@sha256:([a-f0-9]{64}) ]]; then
+    image_ref="${BASH_REMATCH[1]}"
+    pinned="sha256:${BASH_REMATCH[2]}"
+    from_prefix="${from_prefix# }"
+    return 0
+  fi
+
+  return 1
+}
+
 platforms_from_raw() {
   jq -r '
     if (.manifests // .Manifests) then
@@ -194,11 +235,12 @@ skopeo_raw_to_file() {
 exit_code=0
 seen=()
 prev_line=""
+image_ref=""
+pinned=""
+from_prefix=""
 
 while IFS= read -r line || [[ -n "$line" ]]; do
-  if [[ "$line" =~ ^FROM[[:space:]]+([^[:space:]]+)@sha256:([a-f0-9]{64}) ]]; then
-    image_ref="${BASH_REMATCH[1]}"
-    pinned="sha256:${BASH_REMATCH[2]}"
+  if parse_from_image "$line"; then
 
     if [[ " ${seen[*]:-} " == *" ${image_ref} "* ]]; then
       prev_line="$line"
@@ -227,7 +269,11 @@ while IFS= read -r line || [[ -n "$line" ]]; do
       echo "    status: OUTDATED"
       echo
       echo "  Suggestion — update Dockerfile pin to latest multi-arch manifest list:"
-      echo "    FROM ${image_ref}@${latest_digest}"
+      if [[ -n "$from_prefix" ]]; then
+        echo "    FROM ${from_prefix} ${image_ref}@${latest_digest}"
+      else
+        echo "    FROM ${image_ref}@${latest_digest}"
+      fi
       echo
       exit_code=1
     fi
