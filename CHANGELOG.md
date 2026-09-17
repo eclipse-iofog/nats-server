@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.14.7] - 2026-09-17
+
+### Changed
+
+- Embedded **nats-server v2.14.7** (from v2.14.5) in `Dockerfile`, `Dockerfile.dev`, and `Dockerfile.edge`; includes upstream [v2.14.6](https://github.com/nats-io/nats-server/releases/tag/v2.14.6) and [v2.14.7](https://github.com/nats-io/nats-server/releases/tag/v2.14.7) fixes.
+- **`Dockerfile`** (linux/amd64, linux/arm64) — refresh digest pins for **UBI 9 minimal** (`user-stage`, `runtime-staging`) and **UBI 9 micro** (final runtime image).
+- Docs (`README.md`, `CONTRIBUTING.md`) — version references updated to **v2.14.7**.
+
+### Fixed
+
+- **`scripts/check-dockerfile-digests.sh`** — parse digest-pinned `FROM` lines that use BuildKit flags (e.g. `--platform=$BUILDPLATFORM`) so builder-stage pins are checked and update suggestions preserve the flag.
+
+### Security
+
+- Upstream JetStream stability and correctness fixes in v2.14.6 and v2.14.7, including filestore sync/compaction, Raft catchup signalling, consumer state races, and metalayer stall fixes; see [nats-server compare v2.14.5...v2.14.7](https://github.com/nats-io/nats-server/compare/v2.14.5...v2.14.7) for the full upstream changelog.
+
 ## [2.14.5] - 2026-08-20
 
 ### Changed
